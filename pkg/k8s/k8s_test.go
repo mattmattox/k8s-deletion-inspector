@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/mattmattox/k8s-deletion-inspector/pkg/k8s"
-	"github.com/mattmattox/k8s-deletion-inspector/pkg/logging"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -14,8 +13,6 @@ import (
 	kubernetesfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 )
-
-var logger = logging.SetupLogging()
 
 func TestConnectToCluster(t *testing.T) {
 	os.Setenv("KUBERNETES_SERVICE_HOST", "dummy-host")
