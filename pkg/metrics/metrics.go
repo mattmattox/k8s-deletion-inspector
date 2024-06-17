@@ -24,6 +24,7 @@ var (
 
 var mu sync.Mutex
 
+// Prometheus metrics
 var (
 	namespaceCount = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "k8s_deletion_inspector_namespace_count",
@@ -47,6 +48,7 @@ var (
 	})
 )
 
+// StuckObject represents a stuck object in the Kubernetes cluster
 type StuckObject struct {
 	Namespace            string                      `json:"namespace"`
 	Resource             string                      `json:"resource"`
@@ -55,11 +57,13 @@ type StuckObject struct {
 	GroupVersionResource schema.GroupVersionResource `json:"groupVersionResource"`
 }
 
+// Set up Prometheus metrics
 func init() {
 	logger.Debug("Initializing Prometheus metrics")
 	prometheus.MustRegister(namespaceCount, scanDuration, totalObjectsScanned, numberStuckObjects)
 }
 
+// GetStuckObjectsHandler handles requests for stuck objects in the cluster
 func GetStuckObjectsHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Debug("Handling request for stuck objects")
 	mu.Lock()
@@ -73,6 +77,7 @@ func GetStuckObjectsHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Debug("Successfully encoded stuck objects")
 }
 
+// AddStuckObject adds a stuck object to the list of stuck objects in memory and Prometheus metrics
 func AddStuckObject(namespace string, gvr schema.GroupVersionResource, object string, deletionTimestamp time.Time) {
 	logger.Debugf("Adding stuck object: namespace=%s, resource=%s, object=%s, deletionTimestamp=%s", namespace, gvr.Resource, object, deletionTimestamp)
 	stuckObjectsMutex.Lock()
@@ -91,6 +96,7 @@ func AddStuckObject(namespace string, gvr schema.GroupVersionResource, object st
 	logger.Debugf("Stuck object added: %+v", stuckObject)
 }
 
+// GetStuckObjects returns the list of stuck objects in the cluster
 func GetStuckObjects() []StuckObject {
 	logger.Debug("Fetching stuck objects")
 	stuckObjectsMutex.Lock()
@@ -100,11 +106,13 @@ func GetStuckObjects() []StuckObject {
 	return stuckObjects
 }
 
+// WriteNamespaceCount sets namespace count for Prometheus metrics
 func WriteNamespaceCount(count int) {
 	logger.Debugf("Setting namespace count to %d", count)
 	namespaceCount.Set(float64(count))
 }
 
+// RecordScanMetrics records scan metrics for Prometheus metrics
 func RecordScanMetrics(start time.Time, namespaces, objects int) {
 	duration := time.Since(start).Seconds()
 	logger.Debugf("Recording scan metrics: duration=%.2f seconds, namespaces=%d, objects=%d", duration, namespaces, objects)

@@ -8,6 +8,7 @@ import (
 
 var logger *logrus.Logger
 
+// SetupLogging initializes the logger with the appropriate settings.
 func SetupLogging() *logrus.Logger {
 	// Get the debug from environment variable
 	debug := false
