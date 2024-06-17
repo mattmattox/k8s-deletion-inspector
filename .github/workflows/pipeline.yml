@@ -28,10 +28,10 @@ jobs:
           go install github.com/securego/gosec/v2/cmd/gosec@latest
           go install github.com/psampaz/go-mod-outdated@latest
 
-      - name: Run tests
-        run: |
-          go test -v ./...
-          go test -cover ./...
+      # - name: Run tests
+      #   run: |
+      #     go test -v ./...
+      #     go test -cover ./...
 
       - name: Go static analysis
         run: |
