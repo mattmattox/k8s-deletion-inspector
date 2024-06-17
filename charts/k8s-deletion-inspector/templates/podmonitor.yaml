@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  labels:
+    app: k8s-deletion-inspector
+    release: "{{ .Release.Name }}"
+  name: "{{ .Release.Name }}"
+spec:
+  podMetricsEndpoints:
+    - interval: 15s
+      port: metrics
+  selector:
+    matchLabels:
+      app: k8s-deletion-inspector
+      release: "{{ .Release.Name }}"

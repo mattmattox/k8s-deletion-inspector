@@ -1,0 +1,35 @@
+---
+extends: default
+
+rules:
+  # General formatting
+  line-length:
+    max: 120
+    level: warning
+  truthy:
+    allowed-values: ["true", "false", "yes", "no", "on", "off"]
+  document-start: disable
+  indentation:
+    spaces: 2
+    indent-sequences: true
+
+  # Naming conventions
+  key-duplicates: enable
+  key-ordering: enable
+  hyphens:
+    level: warning
+
+  # Whitespace and newlines
+  empty-lines: enable
+  new-line-at-end-of-file: enable
+
+  # Specific to GitHub Actions
+  comments-indentation: enable
+  comments:
+    level: warning
+  colons:
+    max-spaces-before: 0
+    max-spaces-after: 1
+# Disable specific rules for specific files (example)
+# ignore:
+#   - "path/to/somefile.yaml": {line-length: disable}

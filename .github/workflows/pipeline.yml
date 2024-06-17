@@ -1,0 +1,148 @@
+name: Test, Build, and Push
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+
+      - name: Install static analysis tools
+        run: |
+          go install golang.org/x/lint/golint@latest
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+
+      - name: Install dependency management tools
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          go install github.com/psampaz/go-mod-outdated@latest
+
+      - name: Run tests
+        run: |
+          go test -v ./...
+          go test -cover ./...
+
+      - name: Go static analysis
+        run: |
+          golint ./...
+          staticcheck ./...
+          go vet ./...
+
+      - name: Dependency management
+        run: |
+          go mod vendor
+          go mod verify
+          go mod tidy
+          
+      - name: Security scanning
+        run: gosec ./...
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Docker build and push
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --pull \
+            --build-arg VERSION=v${{ github.run_number }} \
+            --build-arg GIT_COMMIT=${{ github.sha }} \
+            --build-arg BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+            --cache-from cube8021/k8s-deletion-inspector:latest \
+            -t cube8021/k8s-deletion-inspector:"v${{ github.run_number }}" \
+            -t cube8021/k8s-deletion-inspector:latest \
+            --push \
+            -f Dockerfile .
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Helm
+        uses: azure/setup-helm@v4.2.0
+
+      - name: Helm Lint
+        run: helm lint charts/k8s-deletion-inspector/
+
+      - name: Package Helm chart
+        run: |
+          export CHART_VERSION="v${{ github.run_number }}"
+          export APP_VERSION="v${{ github.run_number }}"
+          export IMAGE_TAG="v${{ github.run_number }}"
+          echo "CHART_VERSION=${CHART_VERSION}"
+          echo "APP_VERSION=${APP_VERSION}"
+          echo "IMAGE_TAG=${IMAGE_TAG}"
+          envsubst < charts/k8s-deletion-inspector/Chart.yaml.template > charts/k8s-deletion-inspector/Chart.yaml
+          envsubst < charts/k8s-deletion-inspector/values.yaml.template > charts/k8s-deletion-inspector/values.yaml
+          helm package charts/k8s-deletion-inspector --destination helm/repo
+
+      # - name: Create Release
+      #   id: create_release
+      #   uses: actions/create-release@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     tag_name: v${{ github.run_number }}
+      #     release_name: Release v${{ github.run_number }}
+      #     draft: false
+      #     prerelease: false
+
+      # - name: Upload Helm Chart as Release Asset
+      #   uses: actions/upload-release-asset@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     upload_url: ${{ steps.create_release.outputs.upload_url }}
+      #     asset_path: helm/repo/k8s-deletion-inspector-v${{ github.run_number }}".tgz
+      #     asset_name: k8s-deletion-inspector-v${{ github.run_number }}".tgz
+      #     asset_content_type: application/octet-stream          
+
+      - name: Checkout helm-chart repository
+        uses: actions/checkout@v4
+        with:
+          repository: supporttools/helm-chart
+          path: helm-chart
+          token: ${{ secrets.BOT_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config --global user.email "github-action@users.noreply.github.com"
+          git config --global user.name "GitHub Action"
+
+      - name: Update Helm repository
+        run: |
+          cp helm/repo/k8s-deletion-inspector-*.tgz helm-chart/
+          cd helm-chart
+          helm repo index . --url https://charts.support.tools
+          git add .
+          git commit -m "Update Helm chart for k8s-deletion-inspector"
+          git push

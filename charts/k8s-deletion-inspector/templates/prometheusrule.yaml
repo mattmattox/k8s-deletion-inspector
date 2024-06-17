@@ -1,0 +1,69 @@
+{{- if .Values.settings.rules }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: "{{ .Release.Name }}"
+  labels:
+    prometheus: k8s-deletion-inspector
+    release: "{{ .Release.Name }}"
+spec:
+  groups:
+  - name: k8s-deletion-inspector.rules
+    rules:
+    - alert: K8sDeletionInspectorPodCrashLoop
+      expr: rate(kube_pod_container_status_restarts_total{namespace="{{ .Release.Namespace }}", pod=~"{{ .Release.Name }}-.*"}[5m]) > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Pod {{ .Release.Name }} is restarting"
+        description: "Pod {{ .Release.Name }} in namespace {{ .Release.Namespace }} is restarting frequently."
+    - alert: K8sDeletionInspectorPodOOMKilled
+      expr: kube_pod_container_status_terminated_reason{reason="OOMKilled", namespace="{{ .Release.Namespace }}", pod=~"{{ .Release.Name }}-.*"} > 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Pod {{ .Release.Name }} is OOMKilled"
+        description: "Pod {{ .Release.Name }} in namespace {{ .Release.Namespace }} is being killed due to OOM (Out Of Memory)."
+    - alert: K8sDeletionInspectorPodNotReady
+      expr: kube_pod_status_ready{namespace="{{ .Release.Namespace }}", pod=~"{{ .Release.Name }}-.*"} == 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Pod {{ .Release.Name }} is not ready"
+        description: "Pod {{ .Release.Name }} in namespace {{ .Release.Namespace }} is not in ready state."
+    - alert: K8sDeletionFoundStuckResources
+      expr: number_stuck_objects{namespace="{{ .Release.Namespace }}"} > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Stuck resources found in {{ .Release.Name }}"
+        description: "There are stuck resources in {{ .Release.Name }} in namespace {{ .Release.Namespace }}. Please investigate."
+    - alert: K8sDeletionInspectorHighCPUUsage
+      expr: sum(rate(container_cpu_usage_seconds_total{namespace="{{ .Release.Namespace }}", pod=~"{{ .Release.Name }}-.*"}[5m])) by (pod) > 0.8
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High CPU usage for pod {{ .Release.Name }}"
+        description: "Pod {{ .Release.Name }} in namespace {{ .Release.Namespace }} is using more than 80% of its allocated CPU."
+    - alert: K8sDeletionInspectorHighMemoryUsage
+      expr: sum(container_memory_working_set_bytes{namespace="{{ .Release.Namespace }}", pod=~"{{ .Release.Name }}-.*"}) by (pod) / sum(container_spec_memory_limit_bytes{namespace="{{ .Release.Namespace }}", pod=~"{{ .Release.Name }}-.*"}) by (pod) > 0.8
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High memory usage for pod {{ .Release.Name }}"
+        description: "Pod {{ .Release.Name }} in namespace {{ .Release.Namespace }} is using more than 80% of its allocated memory."
+    - alert: K8sDeletionInspectorPodFrequentRestarts
+      expr: sum(rate(kube_pod_container_status_restarts_total{namespace="{{ .Release.Namespace }}", pod=~"{{ .Release.Name }}-.*"}[5m])) by (pod) > 3
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Frequent restarts for pod {{ .Release.Name }}"
+        description: "Pod {{ .Release.Name }} in namespace {{ .Release.Namespace }} is restarting more than 3 times in 5 minutes."
+{{- end }}
